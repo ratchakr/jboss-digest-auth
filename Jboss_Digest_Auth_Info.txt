@@ -1,0 +1,247 @@
+1) --- application-roles.properties
+
+hwapdigest=digestadmin
+
+
+2) --- generate hash of password
+digestpasscode
+
+01a247b34d684a286d40fa458a1ed778
+
+
+command to generate hash 
+
+/opt/drutt/local/jboss-as-7.1.3.Final/modules/org/picketbox/main
+
+-- java -cp picketbox.jar  org.jboss.security.auth.callback.RFC2617Digest [username] hwapadmin [realm] ApplicationRealm [password] oracle
+java -cp picketbox-4.0.13.Final.jar  org.jboss.security.auth.callback.RFC2617Digest ratno333 ApplicationRealm ratno999
+
+3) Copy the hash pwd to user.properties file 
+
+4) Make the below entry in domain.xml
+
+				<security-domain name="hwapsecuritydomain" cache-type="default"> 
+                    <authentication> 
+                        <login-module code="UsersRoles" flag="required"> 
+                            <module-option name="usersProperties" value="${jboss.domain.config.dir}/application-users.properties"/> 
+
+                            <module-option name="rolesProperties" value="${jboss.domain.config.dir}/application-roles.properties"/>
+
+                            <module-option name="unauthenticatedIdentity" value="anonymous"/> 
+                            <module-option name="hashAlgorithm" value="MD5"/> 
+                            <module-option name="hashEncoding" value="RFC2617"/> 
+                            <module-option name="hashUserPassword" value="false"/> 
+                            <module-option name="hashStorePassword" value="true"/> 
+                            <module-option name="passwordIsA1Hash" value="true"/> 
+                                                        <!-- <module-option name="realm" value="ApplicationRealm" /> -->
+
+                            <module-option name="storeDigestCallback" value="org.jboss.security.auth.callback.RFC2617Digest"/>
+
+                        </login-module> 
+                    </authentication> 
+                </security-domain>
+				
+                    <security-domain name="hwapsecuritydomain" cache-type="default">
+                        <authentication>
+                            <login-module code="UsersRoles" flag="required">
+                                <module-option name="usersProperties" value="${jboss.domain.config.dir}/application-users.properties"/>
+                                <module-option name="rolesProperties" value="${jboss.domain.config.dir}/application-roles.properties"/>
+                                <module-option name="unauthenticatedIdentity" value="anonymous"/>
+                                <module-option name="hashAlgorithm" value="MD5"/>
+                                <module-option name="hashEncoding" value="RFC2617"/>
+                                <module-option name="hashUserPassword" value="false"/>
+                                <module-option name="hashStorePassword" value="true"/>
+                                <module-option name="passwordIsA1Hash" value="true"/>
+                                <module-option name="storeDigestCallback" value="org.jboss.security.auth.callback.RFC2617Digest"/>
+                            </login-module>
+                        </authentication>
+                    </security-domain>
+				
+
+5) Restart jboss
+
+------------------------------------------------------------------------------------------------------------------
+
+Application side:
+
+1) Make a file inside WEB-INF folder called jboss-web.xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<jboss-web>
+
+    <security-domain>java:/jaas/hwapsecuritydomain</security-domain>
+
+</jboss-web>
+
+2) Modify the web.xml with below tags
+
+<security-constraint>
+
+			<web-resource-collection>
+
+				<web-resource-name>HtmlAuth</web-resource-name>
+
+				<description>application security constraints
+
+				</description>
+
+				<url-pattern>/*</url-pattern>
+
+				<http-method>DELETE</http-method>
+
+				<http-method>PUT</http-method>
+
+				<http-method>HEAD</http-method>
+
+				<http-method>OPTIONS</http-method>
+
+				<http-method>TRACE</http-method>
+
+				<http-method>GET</http-method>
+
+				<http-method>POST</http-method>
+
+			</web-resource-collection>
+
+			<auth-constraint>
+
+				<role-name>digestadmin</role-name>
+
+			</auth-constraint>
+
+		</security-constraint>
+
+		<login-config>
+
+			<auth-method>DIGEST</auth-method>
+
+			<realm-name>ApplicationRealm</realm-name>
+
+		</login-config>
+
+		<security-role>
+
+			<role-name>digestadmin</role-name>
+
+		</security-role>
+
+
+-----------------------------------------------------------------------------------------------------------
+Java Test Client Code:
+
+host here is the ip address where Jboss is running locally
+
+to start jboss in ip 192.168.56.1 run this command
+
+eratnch@5B1SWQ1:~/Ratnopam/Softwares/jboss-eap-6.3.0/bin$ ./standalone.sh -b 192.168.43.79
+
+Code to call http digest
+
+		 
+		 	System.out.println(" Inside callDigestAuthClient method");																																																																																											
+			String host = "192.168.56.1";
+			int port = 8080;
+			String URL = "http://" + host + ":" + port  +  "/srsApps/service/greeting/ADPTest";
+			
+			System.out.println("URL : = "+URL);
+			
+			Authenticator.setDefault(new Authenticator() {
+			    @Override
+			    protected PasswordAuthentication getPasswordAuthentication() {
+					String userName = "hwapadmin";
+					String password = "oracle";
+			    	System.out.println("userName : = "+userName);
+			        return new PasswordAuthentication(userName, password.toCharArray());
+			    }
+			});			
+			
+			try {
+				System.out.println("*******     Opening Connection     *********");
+				//StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder().permitNetwork().build());
+				final URL url = new URL(URL);
+				System.out.println("*******     Opening Connection  1   *********");
+				
+				final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+				final InputStream is = conn.getInputStream();
+				System.out.println("*******     Opening Connection  SUCCESS   *********");
+				final byte[] buffer = new byte[8196];
+				int readCount;
+				final StringBuilder builder = new StringBuilder();
+				while ((readCount = is.read(buffer)) > -1) {
+				    builder.append(new String(buffer, 0, readCount));
+				}
+				final String response = builder.toString();
+				System.out.println(" *************************************************            ****************************** ");
+				System.out.println(" *************************************************            ****************************** ");
+				System.out.println(" RESPONSE of DIGEST ::: = :::"+response);
+				System.out.println(" *************************************************            ****************************** ");
+				System.out.println(" *************************************************            ****************************** ");
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				System.err.println("ERROR DIGEST "+e.getMessage());
+			} 
+	}
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+Run Digest Auth Client from Android Emulator
+
+Before testing from emulator, do the following steps
+
+1) Disconnect from Ericsson LAN
+2) Turn on mobile wifi hotspot on phone
+3) Connect to this wifi hotspot from Laptop
+4) ifconfig in laptop = this ip is 192.168.56.1 in the above case
+5) start jboss in this ip 
+6) Then use the following code from an android activity
+
+	private void testDigestAndroid() {
+
+		try {
+			AndroidHttpClient httpClient = AndroidHttpClient.newInstance("user agent");
+
+			String url = "http://192.168.43.79:8080/srsApps/service/greeting/Ratno";
+			URL urlObj = new URL(url);
+			HttpHost host = new HttpHost(urlObj.getHost(), urlObj.getPort(), urlObj.getProtocol());
+			AuthScope scope = new AuthScope(urlObj.getHost(), urlObj.getPort());
+			UsernamePasswordCredentials creds = new UsernamePasswordCredentials("hwapadmin", "oracle");
+
+			CredentialsProvider cp = new BasicCredentialsProvider();
+			cp.setCredentials(scope, creds);
+			HttpContext credContext = new BasicHttpContext();
+			credContext.setAttribute(ClientContext.CREDS_PROVIDER, cp);
+
+			HttpGet job = new HttpGet(url);
+			HttpResponse response = httpClient.execute(host,job,credContext);
+			StatusLine status = response.getStatusLine();
+			System.out.println("***********          SUCCESS             " + status.toString());
+			
+			 
+			
+			int code = response.getStatusLine().getStatusCode();
+			
+			
+			System.out.println("***********          RESPONSE CODE             " + code); 
+			
+			InputStream is = null;
+			String result = null;
+			if (null != response.getEntity()) {
+		    		is = response.getEntity().getContent();
+		    		result = readLine(is);
+		    		System.out.println( " The result is  ::: uld"+result);
+		        }
+			
+			httpClient.close();
+		} catch (Exception e) {
+			System.out.println("ERROR ANDROID DIGEST "+e.getMessage());
+			e.printStackTrace();
+		} 
+		
+	}
+
+
+It should work perfectly with this set up
+
+
